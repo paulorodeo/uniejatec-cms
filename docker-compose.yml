@@ -1,43 +1,57 @@
-version: '3'
-
 services:
-  payload:
-    image: node:20-alpine
-    ports:
-      - '3000:3000'
-    volumes:
-      - .:/home/node/app
-      - node_modules:/home/node/app/node_modules
-    working_dir: /home/node/app/
-    command: sh -c "corepack enable && corepack prepare pnpm@latest --activate && pnpm install && pnpm dev"
-    depends_on:
-      - mongo
-      # - postgres
+  postgres:
+    image: postgres:16-alpine
+    container_name: uniejatec-cms-postgres
+    restart: unless-stopped
     env_file:
       - .env
-
-  # Ensure your DATABASE_URL uses 'mongo' as the hostname ie. mongodb://mongo/my-db-name
-  mongo:
-    image: mongo:latest
-    ports:
-      - '27017:27017'
-    command:
-      - --storageEngine=wiredTiger
     volumes:
-      - data:/data/db
-    logging:
-      driver: none
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cms_internal
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-uniejatec} -d ${POSTGRES_DB:-uniejatec_cms}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
-  # Uncomment the following to use postgres
-  # postgres:
-  #   restart: always
-  #   image: postgres:latest
-  #   volumes:
-  #     - pgdata:/var/lib/postgresql/data
-  #   ports:
-  #     - "5432:5432"
+  payload:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: uniejatec-cms
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - media_data:/app/media
+    networks:
+      - cms_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://127.0.0.1:3000/admin || exit 1",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+networks:
+  cms_internal:
+    driver: bridge
 
 volumes:
-  data:
-  # pgdata:
-  node_modules:
+  postgres_data:
+  media_data:

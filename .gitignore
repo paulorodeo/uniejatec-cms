@@ -48,3 +48,17 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Production secrets
+.env
+.env.*
+
+# Database backups
+backups/
+
+# Runtime uploads
+media/
+
+# Build artifacts
+.next/
+node_modules/
